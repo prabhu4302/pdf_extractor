@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PDF Certificate Extractor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container mt-5">
+    <h2 class="mb-4">Upload Certificate PDF</h2>
+    <form method="post" enctype="multipart/form-data">
+        <div class="mb-3">
+            <input class="form-control" type="file" name="pdf_file" accept=".pdf" required>
+        </div>
+        <button class="btn btn-primary" type="submit">Extract</button>
+    </form>
+
+    {% if extracted %}
+        <hr>
+        <h4 class="mt-4">Extracted Information:</h4>
+        <ul class="list-group">
+            <li class="list-group-item"><strong>Name:</strong> {{ extracted['Name'] }}</li>
+            <li class="list-group-item"><strong>Course Title:</strong> {{ extracted['Course Title'] }}</li>
+            <li class="list-group-item"><strong>Completion Date:</strong> {{ extracted['Completion Date'] }}</li>
+        </ul>
+        <div class="mt-4">
+            <h6>Raw Extracted Text:</h6>
+            <pre>{{ extracted['Raw Text'] }}</pre>
+        </div>
+    {% endif %}
+</div>
+</body>
+</html>
