@@ -1,42 +1,47 @@
 pipeline {
     agent any
-
+    
     environment {
-        IMAGE_NAME = 'prabhudocker4302/nithya4525'
+        DOCKER_IMAGE = 'your-username/pdf-extractor'
+        DOCKER_TAG = "${env.BUILD_NUMBER}"
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git 'https://github.com/prabhu4302/pdf_extractor.git'
+                checkout scm
             }
         }
-
+        
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("${IMAGE_NAME}:latest")
+                    // Ensure Docker is available
+                    docker.withRegistry('') {
+                        docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}", ".")
+                    }
                 }
             }
         }
-
+        
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                      echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                      docker push ${IMAGE_NAME}:latest
-                    '''
+                script {
+                    // Only needed if pushing to a registry
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
+                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
+                    }
                 }
             }
         }
     }
+    
     post {
-        success {
-            echo 'Docker image built and pushed successfully!'
-        }
         failure {
             echo 'Pipeline failed! Check logs.'
+        }
+        success {
+            echo 'Pipeline succeeded!'
         }
     }
 }
