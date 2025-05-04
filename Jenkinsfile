@@ -1,13 +1,11 @@
 pipeline {
     agent any
-
+    
     environment {
-        // Docker Hub credentials (configure in Jenkins)
-        DOCKER_CREDS = credentials('docker-hub-creds')
         DOCKER_IMAGE = 'prabhudocker4302/nithya4525'
-        DOCKER_TAG = 'latest'
+        DOCKER_TAG = "${env.BUILD_NUMBER}"
     }
-
+    
     stages {
         stage('Checkout') {
             steps {
@@ -15,7 +13,7 @@ pipeline {
                 url: 'https://github.com/prabhu4302/pdf_extractor.git'
             }
         }
-
+        
         stage('Build Docker Image') {
             steps {
                 script {
@@ -23,7 +21,7 @@ pipeline {
                 }
             }
         }
-
+        
         stage('Push to Docker Hub') {
             steps {
                 script {
@@ -33,14 +31,14 @@ pipeline {
                 }
             }
         }
-        
+    }
+    
     post {
         success {
-            echo 'Docker image built and pushed successfully!'
+            echo 'Image successfully pushed to Docker Hub!'
         }
         failure {
-            echo 'Pipeline failed! Check logs.'
+            echo 'Pipeline failed!'
         }
     }
 }
-  }  
