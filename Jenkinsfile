@@ -1,5 +1,5 @@
 environment {
-    DOCKER_IMAGE = 'prabhudocker4302/pdf-extractor'  // Must include your username
+    DOCKER_IMAGE = 'prabhudocker4302/pdf-extractor'  // Must  include your username
     DOCKER_TAG = "${env.BUILD_NUMBER}"
 }
 
