@@ -2,7 +2,7 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_IMAGE = 'your-username/pdf-extractor'
+        DOCKER_IMAGE = 'pdf-extractor'
         DOCKER_TAG = "${env.BUILD_NUMBER}"
     }
 
@@ -25,15 +25,16 @@ pipeline {
         }
         
         stage('Push Docker Image') {
-            steps {
-                script {
-                    // Only needed if pushing to a registry
-                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
-                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
-                    }
-                }
+    steps {
+        script {
+            docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
+                docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
+                // Also push as latest
+                docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push('latest')
             }
         }
+    }
+}
     }
     
     post {
