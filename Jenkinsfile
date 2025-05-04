@@ -1,13 +1,13 @@
 pipeline {
     agent any
-    
+
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
-        
+
         stage('Build Docker Image') {
             steps {
                 script {
@@ -15,7 +15,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Push Docker Image') {
             steps {
                 script {
@@ -25,15 +25,23 @@ pipeline {
                 }
             }
         }
-        stage('Test SSH to EC2') {
+
+        stage('Deploy to EC2') {
             steps {
-                sshagent(['ec2-ssh-key']) {
-                    sh 'ssh -o StrictHostKeyChecking=no ubuntu@13.233.33.93 "hostname && uptime"'
+                sshagent (credentials: ['ec2-ssh-key']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no ubuntu@13.233.33.93"
+                            docker pull prabhudocker4302/pdf-extractor:${BUILD_NUMBER} &&
+                            docker stop pdf-extractor || true &&
+                            docker rm pdf-extractor || true &&
+                            docker run -d --name pdf-extractor prabhudocker4302/pdf-extractor:${BUILD_NUMBER}
+                        "
+                    '''
                 }
             }
         }
     }
-    
+
     post {
         failure {
             echo 'Pipeline failed! Check logs.'
