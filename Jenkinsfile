@@ -4,7 +4,7 @@ pipeline {
     environment {
         // Docker Hub credentials (configure in Jenkins)
         DOCKER_CREDS = credentials('docker-hub-creds')
-        DOCKER_IMAGE = 'your-dockerhub-username/nithya4525'
+        DOCKER_IMAGE = 'prabhudocker4302/nithya4525'
         DOCKER_TAG = 'latest'
     }
 
