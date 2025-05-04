@@ -25,6 +25,13 @@ pipeline {
                 }
             }
         }
+        stage('Test SSH to EC2') {
+            steps {
+                sshagent(['ec2-ssh-key']) {
+                    sh 'ssh -o StrictHostKeyChecking=no ubuntu@13.233.33.93 "hostname && uptime"'
+                }
+            }
+        }
     }
     
     post {
