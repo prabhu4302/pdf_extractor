@@ -13,12 +13,18 @@ stages {
     }
     
     stage('Push Docker Image') {
-        steps {
-            script {
-                docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
-                    docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
-                }
-            }
+    steps {
+        withCredentials([usernamePassword(
+            credentialsId: 'docker-hub-credentials',
+            usernameVariable: 'DOCKER_USER',
+            passwordVariable: 'DOCKER_PASS'
+        )]) {
+            sh """
+                docker login -u $DOCKER_USER -p $DOCKER_PASS
+                docker tag pdf-extractor:7 prabhudocker4302/pdf-extractor:7
+                docker push prabhudocker4302/pdf-extractor:7
+            """
         }
     }
+}
 }
