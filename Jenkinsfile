@@ -36,7 +36,7 @@ pipeline {
         stage('Deploy to EC2') {
            steps {
                sshagent(['ec2-ssh-key']) {
-            sh "ssh -o StrictHostKeyChecking=no ec2-user@3.110.107.194 'docker pull "${DOCKER_IMAGE}:${DOCKER_TAG}" && docker restart my-app'"
+            sh "ssh -o StrictHostKeyChecking=no ec2-user@3.110.107.194 'docker pull prabhudocker4302/nithya4525:latest && docker restart my-app'"
     }
 
     post {
