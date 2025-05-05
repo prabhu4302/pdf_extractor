@@ -37,11 +37,11 @@ jobs:
     - name: Create namespace if not exists
       run: kubectl create namespace default --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Update Helm dependencies
-      run: helm dependency update ./pdf_extractor/helm-chart
+    -- name: Update Helm dependencies
+      run: helm dependency update ./helm-chart
 
     - name: Deploy using Helm
-      run: helm upgrade --install pdf-scanner ./pdf_extractor/helm-chart --namespace default
+      run: helm upgrade --install pdf-scanner ./helm-chart --namespace default
 
-    - name: Show Service Info
+      - name: Show Service Info
       run: kubectl get svc pdf-scanner -o wide
