@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pdf-scanner
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: pdf-scanner
+  template:
+    metadata:
+      labels:
+        app: pdf-scanner
+    spec:
+      containers:
+      - name: pdf-scanner
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        ports:
+        - containerPort: 5000
