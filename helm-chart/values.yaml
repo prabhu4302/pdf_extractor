@@ -1,0 +1,7 @@
+replicaCount: 1
+image:
+  repository: your-dockerhub-username/pdf-scanner
+  tag: latest
+service:
+  type: LoadBalancer
+  port: 80
