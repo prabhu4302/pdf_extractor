@@ -43,5 +43,5 @@ jobs:
     - name: Deploy using Helm
       run: helm upgrade --install pdf-scanner ./helm-chart --namespace default
 
-      - name: Show Service Info
+    - name: Show Service Info
       run: kubectl get svc pdf-scanner -o wide
