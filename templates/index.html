@@ -1,44 +1,73 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>PDF Certificate Extractor</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-<div class="container mt-5">
-    <h2 class="mb-4">Upload Certificate PDF</h2>
-    
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            <div class="alert alert-warning">
-                {% for message in messages %}
-                    <p>{{ message }}</p>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
-    
-    <form method="post" enctype="multipart/form-data">
-        <div class="mb-3">
-            <input class="form-control" type="file" name="pdf_file" accept=".pdf" required>
-        </div>
-        <button class="btn btn-primary" type="submit">Extract</button>
-    </form>
+import os
+import tempfile
+from flask import Flask, render_template, request, redirect, url_for, flash
+import fitz  # PyMuPDF
+import re
 
-    {% if extracted %}
-        <hr>
-        <h4 class="mt-4">Extracted Information:</h4>
-        <ul class="list-group">
-            <li class="list-group-item"><strong>Name:</strong> {{ extracted['Name'] }}</li>
-            <li class="list-group-item"><strong>Course Title:</strong> {{ extracted['Course Title'] }}</li>
-            <li class="list-group-item"><strong>Completion Date:</strong> {{ extracted['Completion Date'] }}</li>
-        </ul>
-        <div class="mt-4">
-            <h6>Raw Extracted Text:</h6>
-            <pre>{{ extracted['Raw Text'] }}</pre>
-        </div>
-    {% endif %}
-</div>
-</body>
-</html>
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = tempfile.mkdtemp()
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB limit
+app.secret_key = os.urandom(24)
+
+def extract_fields_from_pdf(pdf_path):
+    try:
+        doc = fitz.open(pdf_path)
+        text = ""
+        for page in doc:
+            text += page.get_text()
+
+        name_match = re.search(r"This is to certify that\s+(.*?)\s+has completed", text, re.DOTALL)
+        course_match = re.search(r"has completed\s+(.*?)\s+on", text, re.DOTALL)
+        date_match = re.search(r"on\s+([^\n]+)", text)
+
+        return {
+            "Name": name_match.group(1).strip() if name_match else "Not found",
+            "Course Title": course_match.group(1).strip() if course_match else "Not found",
+            "Completion Date": date_match.group(1).strip() if date_match else "Not found",
+            "Raw Text": text.strip(),
+            "Filename": os.path.basename(pdf_path)
+        }
+    except Exception as e:
+        print(f"Error processing PDF: {e}")
+        return None
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    if request.method == 'POST':
+        if 'pdf_files' not in request.files:
+            flash('No files selected')
+            return redirect(request.url)
+
+        files = request.files.getlist('pdf_files')
+        if len(files) > 3:
+            flash('Maximum 3 files allowed')
+            return redirect(request.url)
+
+        extracted_data = []
+        for file in files:
+            if file.filename == '':
+                flash('One of the files was empty')
+                continue
+
+            if file and file.filename.lower().endswith('.pdf'):
+                try:
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+                    file.save(file_path)
+                    
+                    extracted = extract_fields_from_pdf(file_path)
+                    os.remove(file_path)  # Clean up
+                    
+                    if extracted:
+                        extracted_data.append(extracted)
+                    else:
+                        flash(f'Error processing {file.filename}')
+                except Exception as e:
+                    flash(f'Error processing {file.filename}: {str(e)}')
+
+        return render_template('index.html', extracted_data=extracted_data)
+
+    return render_template('index.html', extracted_data=None)
+
+if __name__ == '__main__':
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
