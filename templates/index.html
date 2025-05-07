@@ -8,6 +8,17 @@
 <body class="bg-light">
 <div class="container mt-5">
     <h2 class="mb-4">Upload Certificate PDF</h2>
+    
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="alert alert-warning">
+                {% for message in messages %}
+                    <p>{{ message }}</p>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+    
     <form method="post" enctype="multipart/form-data">
         <div class="mb-3">
             <input class="form-control" type="file" name="pdf_file" accept=".pdf" required>
@@ -21,7 +32,7 @@
         <ul class="list-group">
             <li class="list-group-item"><strong>Name:</strong> {{ extracted['Name'] }}</li>
             <li class="list-group-item"><strong>Course Title:</strong> {{ extracted['Course Title'] }}</li>
-            <li class="list-group-item"><strong>Completion Date:</strong> {{ extracted['Completion Dated'] }}</li>
+            <li class="list-group-item"><strong>Completion Date:</strong> {{ extracted['Completion Date'] }}</li>
         </ul>
         <div class="mt-4">
             <h6>Raw Extracted Text:</h6>
@@ -31,4 +42,3 @@
 </div>
 </body>
 </html>
-
