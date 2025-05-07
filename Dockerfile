@@ -1,20 +1,17 @@
-# Use official Python image
-FROM python:3.10-slim
+FROM python:3.9-slim
 
-# Set working directory
 WORKDIR /app
 
-# Copy all files
-COPY . .
-
-# Install dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Create uploads directory
-RUN mkdir -p uploads
+COPY . .
 
-# Expose port
+RUN mkdir -p /app/uploads
+
+ENV FLASK_APP=app.py
+ENV FLASK_ENV=production
+
 EXPOSE 5000
 
-# Start app
-CMD ["python", "app.py"]
+CMD ["flask", "run", "--host=0.0.0.0"]
