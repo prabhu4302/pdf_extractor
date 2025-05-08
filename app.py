@@ -57,6 +57,10 @@ def verify_certificate(pdf_path):
         for page in doc:
             text += page.get_text()
 
+        # Debugging: print extracted text to check the format
+        print(f"Extracted text from {pdf_path}:")
+        print(text)
+
         data = extract_certificate_data(text)
         if not data:
             return None
@@ -64,6 +68,8 @@ def verify_certificate(pdf_path):
         # Check if course matches any approved pattern
         course_title = data['course']
         course_code = None
+        
+        print(f"Extracted course title: {course_title}")  # Debugging the course title
         
         for pattern, code in APPROVED_COURSES.items():
             if re.search(pattern, course_title, re.IGNORECASE):
@@ -83,6 +89,7 @@ def verify_certificate(pdf_path):
     except Exception as e:
         print(f"Error processing {pdf_path}: {str(e)}")
         return None
+
 
 def generate_verification_pdf(verified_courses):
     buffer = BytesIO()
