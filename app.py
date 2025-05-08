@@ -13,9 +13,8 @@ app.secret_key = 'your-secret-key-here'
 APPROVED_COURSES = {
     r"(?i)living up to our commitments rcm training": "RCM",
     r"(?i)working in partnership with bt": "BT-PART",
-    r"(?i)don't feed the 'ish": "DFT"
+    r"(?i)[^\w]don't[^\w]feed[^\w]the[^\w]'ish": "DFT"  # Updated pattern for DFT
 }
-
 def extract_certificate_data(text):
     """Improved extraction with multiple pattern attempts"""
     patterns = [
