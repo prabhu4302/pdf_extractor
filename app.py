@@ -1,10 +1,11 @@
 import os
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, flash
 import fitz  # PyMuPDF
 import re
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
+app.secret_key = 'your-secret-key-here'  # Required for flashing messages
 
 def extract_fields_from_pdf(pdf_path):
     doc = fitz.open(pdf_path)
@@ -28,17 +29,31 @@ def extract_fields_from_pdf(pdf_path):
 def index():
     extracted_data = []
     if request.method == 'POST':
-        files = request.files.getlist('pdf_files')
+        # Get all three possible file inputs
+        files = [
+            request.files.get('pdf_file_1'),
+            request.files.get('pdf_file_2'),
+            request.files.get('pdf_file_3')
+        ]
 
-        if not files or len(files) == 0:
+        # Filter out empty file inputs
+        valid_files = [file for file in files if file and file.filename != '']
+
+        if not valid_files:
+            flash('Please upload at least one PDF file')
             return redirect(request.url)
 
-        for file in files[:3]:  # limit to 3 files
-            if file and file.filename.endswith('.pdf'):
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-                file.save(file_path)
-                extracted = extract_fields_from_pdf(file_path)
-                extracted_data.append(extracted)
+        for file in valid_files:
+            if file.filename.endswith('.pdf'):
+                try:
+                    file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+                    file.save(file_path)
+                    extracted = extract_fields_from_pdf(file_path)
+                    extracted_data.append(extracted)
+                except Exception as e:
+                    flash(f'Error processing {file.filename}: {str(e)}')
+            else:
+                flash(f'File {file.filename} is not a PDF')
 
     return render_template('index.html', extracted=extracted_data)
 
