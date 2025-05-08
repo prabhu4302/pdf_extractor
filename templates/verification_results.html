@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verification Results</title>
+</head>
+<body>
+    <h1>BT Certificate Verification Results</h1>
+
+    {% if verified_courses %}
+        <h2>Valid Certificates</h2>
+        <ul>
+        {% for course in verified_courses %}
+            <li>
+                <strong>{{ course.name }}</strong> completed 
+                <em>{{ course.course_title }}</em> ({{ course.course_code }}) on 
+                {{ course.completion_date }} 
+                <br><small>File: {{ course.filename }}</small>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p><strong>No valid certificates found.</strong></p>
+    {% endif %}
+
+    {% if invalid_files %}
+        <h2>Invalid Files</h2>
+        <ul>
+        {% for file in invalid_files %}
+            <li>{{ file }}</li>
+        {% endfor %}
+        </ul>
+    {% endif %}
+
+    <a href="/">← Back to Upload</a>
+</body>
+</html>
