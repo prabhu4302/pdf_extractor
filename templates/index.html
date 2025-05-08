@@ -7,7 +7,7 @@
 </head>
 <body class="bg-light">
 <div class="container mt-5">
-    <h2 class="mb-4">Upload Certificate PDF</h2>
+    <h2 class="mb-4">Upload Certificate PDFs</h2>
     
     {% with messages = get_flashed_messages() %}
         {% if messages %}
@@ -19,26 +19,34 @@
         {% endif %}
     {% endwith %}
     
-   <form method="post" enctype="multipart/form-data">
-    <div class="mb-3">
-        <label class="form-label">Select up to 3 certificate PDFs:</label>
-        <input class="form-control" type="file" name="pdf_files" accept=".pdf" multiple required>
-    </div>
-    <button class="btn btn-primary" type="submit">Extract</button>
-</form>
-
-{% if extracted %}
-    <hr>
-    <h4 class="mt-4">Extracted Information:</h4>
-    {% for data in extracted %}
-        <div class="card p-3 mb-3">
-            <h5>{{ data.Filename }}</h5>
-            <p><strong>Name:</strong> {{ data.Name }}</p>
-            <p><strong>Course Title:</strong> {{ data["Course Title"] }}</p>
-            <p><strong>Completion Date:</strong> {{ data["Completion Date"] }}</p>
+    <form method="post" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label class="form-label">Certificate PDF 1:</label>
+            <input class="form-control" type="file" name="pdf_file_1" accept=".pdf">
         </div>
-    {% endfor %}
-{% endif %}
+        <div class="mb-3">
+            <label class="form-label">Certificate PDF 2:</label>
+            <input class="form-control" type="file" name="pdf_file_2" accept=".pdf">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Certificate PDF 3:</label>
+            <input class="form-control" type="file" name="pdf_file_3" accept=".pdf">
+        </div>
+        <button class="btn btn-primary" type="submit">Extract</button>
+    </form>
+
+    {% if extracted %}
+        <hr>
+        <h4 class="mt-4">Extracted Information:</h4>
+        {% for data in extracted %}
+            <div class="card p-3 mb-3">
+                <h5>{{ data.Filename }}</h5>
+                <p><strong>Name:</strong> {{ data.Name }}</p>
+                <p><strong>Course Title:</strong> {{ data["Course Title"] }}</p>
+                <p><strong>Completion Date:</strong> {{ data["Completion Date"] }}</p>
+            </div>
+        {% endfor %}
+    {% endif %}
 </div>
 </body>
 </html>
