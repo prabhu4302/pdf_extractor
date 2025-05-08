@@ -1,66 +1,47 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>PDF Certificate Extractor</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        .certificate-card {
-            border-left: 4px solid #0d6efd;
-            margin-bottom: 20px;
-        }
-    </style>
-</head>
-<body class="bg-light">
-<div class="container mt-5">
-    <h2 class="mb-4">Upload Certificate PDFs</h2>
-    
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            <div class="alert alert-warning">
-                {% for message in messages %}
-                    <p>{{ message }}</p>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
-    
-    <form method="post" enctype="multipart/form-data">
-        <div class="mb-3">
-            <label class="form-label">Select up to 3 certificate PDFs:</label>
-            <input class="form-control" type="file" name="pdf_files" accept=".pdf" multiple required>
-            <div class="form-text">Hold Ctrl/Cmd to select multiple files</div>
-        </div>
-        <button class="btn btn-primary" type="submit">Extract Information</button>
-    </form>
+import os
+from flask import Flask, render_template, request, redirect
+import fitz  # PyMuPDF
+import re
 
-    {% if extracted_data %}
-        <hr>
-        <h4 class="mt-4">Extracted Certificates:</h4>
-        
-        {% for extracted in extracted_data %}
-        <div class="card certificate-card mb-3">
-            <div class="card-body">
-                <h5 class="card-title">{{ extracted['Filename'] }}</h5>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item"><strong>Name:</strong> {{ extracted['Name'] }}</li>
-                    <li class="list-group-item"><strong>Course Title:</strong> {{ extracted['Course Title'] }}</li>
-                    <li class="list-group-item"><strong>Completion Date:</strong> {{ extracted['Completion Date'] }}</li>
-                </ul>
-                <div class="mt-3">
-                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" 
-                            data-bs-target="#rawText{{ loop.index }}">
-                        Show Raw Text
-                    </button>
-                    <div class="collapse mt-2" id="rawText{{ loop.index }}">
-                        <pre class="bg-dark text-white p-3 rounded">{{ extracted['Raw Text'] }}</pre>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    {% endif %}
-</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = 'uploads'
+
+def extract_fields_from_pdf(pdf_path):
+    doc = fitz.open(pdf_path)
+    text = ""
+    for page in doc:
+        text += page.get_text()
+
+    name_match = re.search(r"This is to certify that\s+(.*?)\s+has completed", text, re.DOTALL)
+    course_match = re.search(r"has completed\s+(.*?)\s+on", text, re.DOTALL)
+    date_match = re.search(r"on\s+([^\n]+)", text)
+
+    return {
+        "Filename": os.path.basename(pdf_path),
+        "Name": name_match.group(1).strip() if name_match else "Not found",
+        "Course Title": course_match.group(1).strip() if course_match else "Not found",
+        "Completion Date": date_match.group(1).strip() if date_match else "Not found",
+        "Raw Text": text.strip()
+    }
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    extracted_data = []
+    if request.method == 'POST':
+        files = request.files.getlist('pdf_files')
+
+        if not files or len(files) == 0:
+            return redirect(request.url)
+
+        for file in files[:3]:  # limit to 3 files
+            if file and file.filename.endswith('.pdf'):
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+                file.save(file_path)
+                extracted = extract_fields_from_pdf(file_path)
+                extracted_data.append(extracted)
+
+    return render_template('index.html', extracted=extracted_data)
+
+if __name__ == '__main__':
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
