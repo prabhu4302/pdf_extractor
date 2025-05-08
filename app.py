@@ -1,125 +1,83 @@
-import os
-from flask import Flask, render_template, request, redirect, flash
-import fitz  # PyMuPDF
 import re
-
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.secret_key = 'your-secret-key-here'
-
-# Approved course patterns
-APPROVED_COURSES = {
-    r"(?i)living up to our commitments rcm training": "RCM",
-    r"(?i)working in partnership with bt": "BT-PART",
-    r"(?i)[^\w]*don't[^\w]*feed[^\w]*the[^\w]*'ish": "DFT"
-}
-
-def extract_certificate_data(text):
-    """Attempt to extract name, course, and date from PDF text"""
-    patterns = [
-        {
-            'name': re.compile(r"certificate of completion.*?This is to certify that\s*(.*?)\s*has completed", re.DOTALL | re.IGNORECASE),
-            'course': re.compile(r"has completed\s*(.*?)\s*on", re.DOTALL | re.IGNORECASE),
-            'date': re.compile(r"on\s*(\d{1,2}/\d{1,2}/\d{4})")
-        },
-        {
-            'name': re.compile(r"certificate.*?awarded to\s*(.*?)\s*for", re.DOTALL | re.IGNORECASE),
-            'course': re.compile(r"for\s*(.*?)\s*completed", re.DOTALL | re.IGNORECASE),
-            'date': re.compile(r"completed on\s*(\d{1,2}/\d{1,2}/\d{4})")
-        }
-    ]
-
-    for pattern in patterns:
-        try:
-            name_match = pattern['name'].search(text)
-            course_match = pattern['course'].search(text)
-            date_match = pattern['date'].search(text)
-            if name_match and course_match:
-                return {
-                    'name': name_match.group(1).strip(),
-                    'course': course_match.group(1).strip(),
-                    'date': date_match.group(1) if date_match else "Date not found"
-                }
-        except Exception:
-            continue
-
-    return None
+import fitz  # PyMuPDF
 
 def verify_certificate(pdf_path):
+    """
+    Verify a BT Group certificate with the exact format shown in the sample.
+    Returns extracted data if valid, None if invalid.
+    """
     try:
+        # Open PDF and extract text
         doc = fitz.open(pdf_path)
         text = ""
         for page in doc:
             text += page.get_text()
         
-        print(f"=== Extracted from {pdf_path} ===")
+        # Debug: Print extracted text
+        print("Extracted text from PDF:")
+        print("="*50)
         print(text)
-        print("=== END ===")
+        print("="*50)
 
-        data = extract_certificate_data(text)
-        if not data:
-            print(f"❌ Could not extract structured data from: {pdf_path}")
+        # Verify required elements exist
+        required_elements = [
+            "BT Group",
+            "Certificate of completion",
+            "This is to certify that",
+            "has completed",
+            "on"
+        ]
+        
+        for element in required_elements:
+            if element not in text:
+                print(f"Missing required element: {element}")
+                return None
+
+        # Extract data using precise pattern matching
+        pattern = re.compile(
+            r"BT Group\s+Certificate of completion\s+This is to certify that\s+-+\s+(.*?)\s+-+\s+has completed\s+-+\s+(.*?)\s+-+\s+on\s+-+\s+(\d{1,2}/\d{1,2}/\d{4})",
+            re.DOTALL
+        )
+        
+        match = pattern.search(text)
+        if not match:
+            print("Certificate format does not match expected pattern")
             return None
 
-        course_title = data['course']
-        course_code = None
+        name = match.group(1).strip()
+        course = match.group(2).strip()
+        date = match.group(3).strip()
 
-        for pattern, code in APPROVED_COURSES.items():
-            if re.search(pattern, course_title, re.IGNORECASE):
-                course_code = code
-                break
-
-        if not course_code:
-            print(f"❌ Course not approved: {course_title}")
+        # Verify course title
+        approved_courses = {
+            "Don't Feed The 'ish": "DFT",
+            "Mandatory - Living up to Our Commitments RCM Training": "RCM",
+            "Mandatory - Working In Partnership with BT": "BT-PART"
+        }
+        
+        if course not in approved_courses:
+            print(f"Course not in approved list: {course}")
             return None
 
+        # Return extracted data
         return {
-            "name": data['name'],
-            "course_title": course_title,
-            "course_code": course_code,
-            "completion_date": data['date'],
-            "filename": os.path.basename(pdf_path)
+            "name": name,
+            "course_title": course,
+            "course_code": approved_courses[course],
+            "completion_date": date,
+            "status": "Verified"
         }
 
     except Exception as e:
-        print(f"Error processing {pdf_path}: {str(e)}")
+        print(f"Verification error: {str(e)}")
         return None
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        files = [
-            request.files.get('pdf_file_1'),
-            request.files.get('pdf_file_2'),
-            request.files.get('pdf_file_3')
-        ]
-
-        verified_courses = []
-        invalid_files = []
-
-        for file in [f for f in files if f and f.filename]:
-            if not file.filename.lower().endswith('.pdf'):
-                invalid_files.append(file.filename)
-                continue
-
-            try:
-                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-                file.save(file_path)
-
-                result = verify_certificate(file_path)
-                if result:
-                    verified_courses.append(result)
-                else:
-                    invalid_files.append(file.filename)
-            except Exception as e:
-                flash(f"Error processing {file.filename}: {str(e)}", "error")
-                invalid_files.append(file.filename)
-
-        return render_template('results.html', verified_courses=verified_courses, invalid_files=invalid_files)
-
-    return render_template('index.html')
-    
-if __name__ == '__main__':
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+# Example usage:
+result = verify_certificate("CertificateOfCompletion (2).pdf")
+if result:
+    print("\nCertificate is valid!")
+    print("Extracted data:")
+    for key, value in result.items():
+        print(f"{key}: {value}")
+else:
+    print("\nCertificate verification failed")
