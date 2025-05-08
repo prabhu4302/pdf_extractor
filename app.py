@@ -2,71 +2,107 @@ import os
 from flask import Flask, render_template, request, redirect, flash, make_response
 import fitz  # PyMuPDF
 import re
-try:
-    from reportlab.pdfgen import canvas
-    from io import BytesIO
-    PDF_SUPPORT = True
-except ImportError:
-    PDF_SUPPORT = False
+from reportlab.pdfgen import canvas
+from io import BytesIO
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = 'your-secret-key-here'
 
-# Approved course titles
+# Approved course patterns (more flexible matching)
 APPROVED_COURSES = {
-    "Don't Feed The 'ish": "DFT",
-    "Mandatory - Working In Partnership with BT": "BT-PART",
-    "Mandatory - Living up to Our Commitments RCM Training": "RCM"
+    r"(?i)living up to our commitments rcm training": "RCM",
+    r"(?i)working in partnership with bt": "BT-PART",
+    r"(?i)don't feed the 'ish": "DFT"
 }
 
-def is_valid_certificate(text):
-    """Check basic certificate structure"""
-    return all(
-        elem in text for elem in [
-            "BT Group", 
-            "Certificate of completion",
-            "has completed",
-            "on"
-        ]
-    )
+def extract_certificate_data(text):
+    """Improved extraction with multiple pattern attempts"""
+    patterns = [
+        # Pattern 1: Standard BT format
+        {
+            'name': re.compile(r"certificate of completion.*?This is to certify that\s*(.*?)\s*has completed", re.DOTALL|re.IGNORECASE),
+            'course': re.compile(r"has completed\s*(.*?)\s*on", re.DOTALL|re.IGNORECASE),
+            'date': re.compile(r"on\s*(\d{1,2}/\d{1,2}/\d{4})")
+        },
+        # Pattern 2: Alternative format
+        {
+            'name': re.compile(r"certificate.*?awarded to\s*(.*?)\s*for", re.DOTALL|re.IGNORECASE),
+            'course': re.compile(r"for\s*(.*?)\s*completed", re.DOTALL|re.IGNORECASE),
+            'date': re.compile(r"completed on\s*(\d{1,2}/\d{1,2}/\d{4})")
+        }
+    ]
+
+    for pattern in patterns:
+        try:
+            name_match = pattern['name'].search(text)
+            course_match = pattern['course'].search(text)
+            date_match = pattern['date'].search(text)
+            
+            if name_match and course_match:
+                return {
+                    'name': name_match.group(1).strip(),
+                    'course': course_match.group(1).strip(),
+                    'date': date_match.group(1) if date_match else None
+                }
+        except Exception:
+            continue
+    
+    return None
 
 def verify_certificate(pdf_path):
-    doc = fitz.open(pdf_path)
-    text = ""
-    for page in doc:
-        text += page.get_text()
+    try:
+        doc = fitz.open(pdf_path)
+        text = ""
+        for page in doc:
+            text += page.get_text()
 
-    if not is_valid_certificate(text):
+        data = extract_certificate_data(text)
+        if not data:
+            return None
+
+        # Check if course matches any approved pattern
+        course_title = data['course']
+        course_code = None
+        
+        for pattern, code in APPROVED_COURSES.items():
+            if re.search(pattern, course_title, re.IGNORECASE):
+                course_code = code
+                break
+
+        if not course_code:
+            return None
+
+        return {
+            "course_title": course_title,
+            "course_code": course_code,
+            "completion_date": data['date'] or "Date not available",
+            "filename": os.path.basename(pdf_path)
+        }
+
+    except Exception as e:
+        print(f"Error processing {pdf_path}: {str(e)}")
         return None
-
-    # Extract course title
-    course_match = re.search(r"has completed\s+-+\s+## (.*?)\s+on", text, re.DOTALL) or \
-                  re.search(r"has completed\s+(.*?)\s+on", text, re.DOTALL)
-    
-    course_title = course_match.group(1).strip() if course_match else None
-
-    if not course_title or course_title not in APPROVED_COURSES:
-        return None
-
-    # Extract completion date
-    date_match = re.search(r"on\s+(\d{1,2}/\d{1,2}/\d{4})", text)
-    
-    return {
-        "course_title": course_title,
-        "course_code": APPROVED_COURSES[course_title],
-        "completion_date": date_match.group(1) if date_match else "Date not available"
-    }
 
 def generate_verification_pdf(verified_courses):
-    if not PDF_SUPPORT:
-        raise RuntimeError("PDF generation support is not available")
-    
     buffer = BytesIO()
     p = canvas.Canvas(buffer)
     
-    # PDF generation code remains the same as before
-    # ... [rest of your PDF generation code]
+    # PDF styling
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(100, 800, "BT Certificate Verification Report")
+    p.setFont("Helvetica", 12)
+    p.drawString(100, 770, "The following BT certificates have been verified:")
+    
+    y_position = 730
+    for course in verified_courses:
+        p.drawString(100, y_position, f"• {course['course_title']} ({course['course_code']})")
+        p.drawString(120, y_position-20, f"Completed: {course['completion_date']}")
+        p.drawString(120, y_position-40, f"File: {course['filename']}")
+        y_position -= 70
+    
+    p.setFont("Helvetica-Oblique", 10)
+    p.drawString(100, 50, "Generated by BT Certificate Verification System")
     
     p.showPage()
     p.save()
@@ -76,10 +112,6 @@ def generate_verification_pdf(verified_courses):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        if not PDF_SUPPORT:
-            flash("PDF generation is not properly configured", "error")
-            return redirect(request.url)
-
         files = [
             request.files.get('pdf_file_1'),
             request.files.get('pdf_file_2'),
@@ -87,37 +119,44 @@ def index():
         ]
 
         verified_courses = []
-        rejected_files = []
+        invalid_files = []
 
-        for file in [f for f in files if f is not None]:
+        for file in [f for f in files if f and f.filename]:
             if not file.filename.lower().endswith('.pdf'):
-                rejected_files.append(file.filename)
+                invalid_files.append(file.filename)
                 continue
 
             try:
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
                 file.save(file_path)
+                
                 result = verify_certificate(file_path)
                 if result:
                     verified_courses.append(result)
                 else:
-                    rejected_files.append(file.filename)
+                    invalid_files.append(file.filename)
             except Exception as e:
-                rejected_files.append(file.filename)
+                invalid_files.append(file.filename)
+                flash(f"Error processing {file.filename}: {str(e)}", "error")
 
         if verified_courses:
             try:
                 pdf_buffer = generate_verification_pdf(verified_courses)
                 response = make_response(pdf_buffer.getvalue())
                 response.headers['Content-Type'] = 'application/pdf'
-                response.headers['Content-Disposition'] = 'inline; filename=bt_certificate_verification.pdf'
+                response.headers['Content-Disposition'] = 'inline; filename=bt_verification_report.pdf'
                 return response
             except Exception as e:
-                flash(f"Failed to generate PDF: {str(e)}", "error")
-                return redirect(request.url)
+                flash(f"Failed to generate PDF report: {str(e)}", "error")
+        elif invalid_files:
+            flash("No valid BT certificates found in the uploaded files. Please check:", "error")
+            for filename in invalid_files:
+                flash(f"- {filename}", "error")
         else:
-            flash("No valid BT certificates were found in the uploaded files", "error")
-            return redirect(request.url)
+            flash("No valid files were uploaded", "error")
+
+        return redirect(request.url)
 
     return render_template('index.html')
 
