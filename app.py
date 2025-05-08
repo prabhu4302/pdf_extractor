@@ -1,134 +1,108 @@
 import os
-import re
-from datetime import datetime
-from io import BytesIO
 from flask import Flask, render_template, request, redirect, flash, make_response
 import fitz  # PyMuPDF
+import re
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+from io import BytesIO
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = 'your-secret-key-here'
 
-# Approved courses with exact matching
+# Approved course patterns (more flexible matching)
 APPROVED_COURSES = {
-    "Mandatory - Living up to Our Commitments RCM Training": "RCM",
-    "Mandatory - Working In Partnership with BT": "BT-PART",
-    "Don't Feed The 'ish": "DFT"
+    r"(?i)living up to our commitments rcm training": "RCM",
+    r"(?i)working in partnership with bt": "BT-PART",
+    r"(?i)don't feed the 'ish": "DFT"
 }
 
-def extract_certificate_data(text, filename):
-    """Extract data from BT certificates with robust error handling"""
-    print(f"\nProcessing file: {filename}")
-    print("Raw text content:")
-    print("="*50)
-    print(text)
-    print("="*50)
-
-    try:
-        # Extract name (between certification line and first separator)
-        name_match = re.search(
-            r"Certificate of completion.*?This is to certify that\s*[\n-]+\s*(.*?)\s*[\n-]+\s*has completed", 
-            text, 
-            re.DOTALL
-        )
-        name = name_match.group(1).strip() if name_match else None
-        print(f"Extracted name: {name}")
-
-        # Extract course title (between separators)
-        course_match = re.search(
-            r"has completed\s*[\n-]+\s*(.*?)\s*[\n-]+\s*on", 
-            text, 
-            re.DOTALL
-        )
-        course = course_match.group(1).strip() if course_match else None
-        print(f"Extracted course: {course}")
-
-        # Extract date (after last separator)
-        date_match = re.search(r"on\s*[\n-]*\s*(\d{1,2}/\d{1,2}/\d{4})", text)
-        date = date_match.group(1) if date_match else None
-        print(f"Extracted date: {date}")
-
-        return {
-            'name': name,
-            'course': course,
-            'date': date
+def extract_certificate_data(text):
+    """Improved extraction with multiple pattern attempts"""
+    patterns = [
+        # Pattern 1: Standard BT format
+        {
+            'name': re.compile(r"certificate of completion.*?This is to certify that\s*(.*?)\s*has completed", re.DOTALL|re.IGNORECASE),
+            'course': re.compile(r"has completed\s*(.*?)\s*on", re.DOTALL|re.IGNORECASE),
+            'date': re.compile(r"on\s*(\d{1,2}/\d{1,2}/\d{4})")
+        },
+        # Pattern 2: Alternative format
+        {
+            'name': re.compile(r"certificate.*?awarded to\s*(.*?)\s*for", re.DOTALL|re.IGNORECASE),
+            'course': re.compile(r"for\s*(.*?)\s*completed", re.DOTALL|re.IGNORECASE),
+            'date': re.compile(r"completed on\s*(\d{1,2}/\d{1,2}/\d{4})")
         }
-    except Exception as e:
-        print(f"Extraction error: {str(e)}")
-        return None
+    ]
+
+    for pattern in patterns:
+        try:
+            name_match = pattern['name'].search(text)
+            course_match = pattern['course'].search(text)
+            date_match = pattern['date'].search(text)
+            
+            if name_match and course_match:
+                return {
+                    'name': name_match.group(1).strip(),
+                    'course': course_match.group(1).strip(),
+                    'date': date_match.group(1) if date_match else None
+                }
+        except Exception:
+            continue
+    
+    return None
 
 def verify_certificate(pdf_path):
     try:
-        print(f"\nVerifying: {pdf_path}")
         doc = fitz.open(pdf_path)
-        text = "\n".join([page.get_text("text") for page in doc])
-        
-        # Verify required markers exist
-        required_markers = [
-            "BT Group",
-            "Certificate of completion", 
-            "This is to certify that",
-            "has completed",
-            "on"
-        ]
-        if not all(marker in text for marker in required_markers):
-            print("Missing required certificate markers")
-            return None
+        text = ""
+        for page in doc:
+            text += page.get_text()
 
-        data = extract_certificate_data(text, os.path.basename(pdf_path))
+        data = extract_certificate_data(text)
         if not data:
-            print("Failed to extract certificate data")
             return None
 
-        # Verify course title exactly matches approved courses
+        # Check if course matches any approved pattern
         course_title = data['course']
-        if course_title not in APPROVED_COURSES:
-            print(f"Course not in approved list: {course_title}")
+        course_code = None
+        
+        for pattern, code in APPROVED_COURSES.items():
+            if re.search(pattern, course_title, re.IGNORECASE):
+                course_code = code
+                break
+
+        if not course_code:
             return None
 
-        print("Verification successful!")
         return {
-            "filename": os.path.basename(pdf_path),
-            "name": data['name'],
             "course_title": course_title,
-            "course_code": APPROVED_COURSES[course_title],
-            "completion_date": data['date'],
-            "status": "Verified"
+            "course_code": course_code,
+            "completion_date": data['date'] or "Date not available",
+            "filename": os.path.basename(pdf_path)
         }
 
     except Exception as e:
-        print(f"Verification error: {str(e)}")
+        print(f"Error processing {pdf_path}: {str(e)}")
         return None
 
 def generate_verification_pdf(verified_courses):
     buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=letter)
+    p = canvas.Canvas(buffer)
     
-    # Header
+    # PDF styling
     p.setFont("Helvetica-Bold", 16)
-    p.drawCentredString(300, 770, "BT CERTIFICATE VERIFICATION REPORT")
+    p.drawString(100, 800, "BT Certificate Verification Report")
     p.setFont("Helvetica", 12)
-    p.drawCentredString(300, 745, datetime.now().strftime("%Y-%m-%d %H:%M"))
+    p.drawString(100, 770, "The following BT certificates have been verified:")
     
-    # Verified Certificates
-    y_position = 700
+    y_position = 730
     for course in verified_courses:
-        p.setFont("Helvetica-Bold", 12)
-        p.drawString(50, y_position, course['course_title'])
-        
-        p.setFont("Helvetica", 10)
-        p.drawString(50, y_position-20, f"Name: {course['name']}")
-        p.drawString(50, y_position-40, f"Code: {course['course_code']}")
-        p.drawString(50, y_position-60, f"Completed: {course['completion_date']}")
-        p.drawString(50, y_position-80, f"File: {course['filename']}")
-        
-        y_position -= 100
+        p.drawString(100, y_position, f"• {course['course_title']} ({course['course_code']})")
+        p.drawString(120, y_position-20, f"Completed: {course['completion_date']}")
+        p.drawString(120, y_position-40, f"File: {course['filename']}")
+        y_position -= 70
     
-    # Footer
-    p.setFont("Helvetica-Oblique", 8)
-    p.drawString(50, 30, "Official BT Verification System")
+    p.setFont("Helvetica-Oblique", 10)
+    p.drawString(100, 50, "Generated by BT Certificate Verification System")
     
     p.showPage()
     p.save()
@@ -150,7 +124,6 @@ def index():
         for file in [f for f in files if f and f.filename]:
             if not file.filename.lower().endswith('.pdf'):
                 invalid_files.append(file.filename)
-                flash(f"{file.filename} is not a PDF file", "error")
                 continue
 
             try:
@@ -161,10 +134,8 @@ def index():
                 result = verify_certificate(file_path)
                 if result:
                     verified_courses.append(result)
-                    flash(f"{file.filename} verified successfully!", "success")
                 else:
                     invalid_files.append(file.filename)
-                    flash(f"Verification failed for {file.filename}", "error")
             except Exception as e:
                 invalid_files.append(file.filename)
                 flash(f"Error processing {file.filename}: {str(e)}", "error")
@@ -178,7 +149,13 @@ def index():
                 return response
             except Exception as e:
                 flash(f"Failed to generate PDF report: {str(e)}", "error")
-        
+        elif invalid_files:
+            flash("No valid BT certificates found in the uploaded files. Please check:", "error")
+            for filename in invalid_files:
+                flash(f"- {filename}", "error")
+        else:
+            flash("No valid files were uploaded", "error")
+
         return redirect(request.url)
 
     return render_template('index.html')
