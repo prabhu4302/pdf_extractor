@@ -51,8 +51,10 @@ def verify_certificate(pdf_path):
         text = ""
         for page in doc:
             text += page.get_text()
-
-        print(f"\n--- Extracted text from {os.path.basename(pdf_path)} ---\n{text}\n--- End of text ---\n")
+        
+        print(f"=== Extracted from {pdf_path} ===")
+        print(text)
+        print("=== END ===")
 
         data = extract_certificate_data(text)
         if not data:
