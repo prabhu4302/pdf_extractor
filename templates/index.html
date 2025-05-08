@@ -19,26 +19,26 @@
         {% endif %}
     {% endwith %}
     
-    <form method="post" enctype="multipart/form-data">
-        <div class="mb-3">
-            <input class="form-control" type="file" name="pdf_file" accept=".pdf" required>
-        </div>
-        <button class="btn btn-primary" type="submit">Extract</button>
-    </form>
+   <form method="post" enctype="multipart/form-data">
+    <div class="mb-3">
+        <label class="form-label">Select up to 3 certificate PDFs:</label>
+        <input class="form-control" type="file" name="pdf_files" accept=".pdf" multiple required>
+    </div>
+    <button class="btn btn-primary" type="submit">Extract</button>
+</form>
 
-    {% if extracted %}
-        <hr>
-        <h4 class="mt-4">Extracted Information:</h4>
-        <ul class="list-group">
-            <li class="list-group-item"><strong>Name:</strong> {{ extracted['Name'] }}</li>
-            <li class="list-group-item"><strong>Course Title:</strong> {{ extracted['Course Title'] }}</li>
-            <li class="list-group-item"><strong>Completion Date:</strong> {{ extracted['Completion Date'] }}</li>
-        </ul>
-        <div class="mt-4">
-            <h6>Raw Extracted Text:</h6>
-            <pre>{{ extracted['Raw Text'] }}</pre>
+{% if extracted %}
+    <hr>
+    <h4 class="mt-4">Extracted Information:</h4>
+    {% for data in extracted %}
+        <div class="card p-3 mb-3">
+            <h5>{{ data.Filename }}</h5>
+            <p><strong>Name:</strong> {{ data.Name }}</p>
+            <p><strong>Course Title:</strong> {{ data["Course Title"] }}</p>
+            <p><strong>Completion Date:</strong> {{ data["Completion Date"] }}</p>
         </div>
-    {% endif %}
+    {% endfor %}
+{% endif %}
 </div>
 </body>
 </html>
