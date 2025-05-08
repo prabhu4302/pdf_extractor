@@ -108,7 +108,12 @@ def index():
 def results():
     verified_courses = session.get('verified_courses', [])
     rejected_files = session.get('rejected_files', [])
-    return render_template('results.html', verified_courses=verified_courses, rejected_files=rejected_files)
+
+    # Check if all three certificates are valid
+    all_verified = len(verified_courses) == 3
+
+    return render_template('results.html', verified_courses=verified_courses, rejected_files=rejected_files, all_verified=all_verified)
+
 
 @app.route('/download')
 def download():
