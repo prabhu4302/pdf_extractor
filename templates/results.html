@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head><title>Verification Results</title></head>
+<body>
+  <h2>Valid Certificates</h2>
+  {% if verified_courses %}
+    <ul>
+      {% for course in verified_courses %}
+        <li>
+          {{ course.name }} completed {{ course.course_title }} ({{ course.course_code }}) on {{ course.completion_date }}<br>
+          File: {{ course.filename }}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No valid certificates found.</p>
+  {% endif %}
+
+  <h2>Invalid Files</h2>
+  {% if invalid_files %}
+    <ul>
+      {% for filename in invalid_files %}
+        <li>{{ filename }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No invalid files.</p>
+  {% endif %}
+</body>
+</html>
