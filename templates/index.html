@@ -1,89 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BT Certificate Verification</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        .upload-area {
-            border: 2px dashed #ccc;
-            border-radius: 5px;
-            padding: 2rem;
-            text-align: center;
-            margin-bottom: 2rem;
-            background-color: #f8f9fa;
-        }
-        .upload-area:hover {
-            border-color: #0d6efd;
-            background-color: #e9ecef;
-        }
-        .status-badge {
-            font-size: 0.9rem;
-            margin-left: 10px;
-        }
-    </style>
+    <title>BT Certificate Verifier</title>
 </head>
-<body class="bg-light">
-    <div class="container py-5">
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <div class="card shadow">
-                    <div class="card-header bg-primary text-white">
-                        <h2 class="mb-0">BT Certificate Verification</h2>
-                    </div>
-                    <div class="card-body">
-                        {% with messages = get_flashed_messages(with_categories=true) %}
-                            {% if messages %}
-                                {% for category, message in messages %}
-                                    <div class="alert alert-{{ 'danger' if category == 'error' else 'info' }} alert-dismissible fade show">
-                                        {{ message }}
-                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                                    </div>
-                                {% endfor %}
-                            {% endif %}
-                        {% endwith %}
-
-                        <div class="upload-area">
-                            <h4>Upload BT Certificates</h4>
-                            <p class="text-muted">Upload up to 3 certificate PDFs for verification</p>
-                            <form method="post" enctype="multipart/form-data" class="mt-4">
-                                <div class="mb-3">
-                                    <label class="form-label">Certificate 1:</label>
-                                    <input class="form-control" type="file" name="pdf_file_1" accept=".pdf">
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Certificate 2:</label>
-                                    <input class="form-control" type="file" name="pdf_file_2" accept=".pdf">
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Certificate 3:</label>
-                                    <input class="form-control" type="file" name="pdf_file_3" accept=".pdf">
-                                </div>
-                                <button class="btn btn-primary btn-lg" type="submit">
-                                    <i class="bi bi-upload"></i> Verify Certificates
-                                </button>
-                            </form>
-                        </div>
-
-                        <div class="mt-4">
-                            <h5>How It Works</h5>
-                            <ol>
-                                <li>Upload your BT certificate PDFs (max 3 at a time)</li>
-                                <li>Our system will verify each certificate</li>
-                                <li>If valid, you'll automatically receive a verification PDF</li>
-                                <li>Invalid certificates will show an error message</li>
-                            </ol>
-                        </div>
-                    </div>
-                    <div class="card-footer text-muted">
-                        BT Certificate Verification System - © 2024
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<body>
+    <h1>Upload BT Certificate PDFs</h1>
+    <form method="POST" enctype="multipart/form-data">
+        <p><input type="file" name="pdf_file_1"></p>
+        <p><input type="file" name="pdf_file_2"></p>
+        <p><input type="file" name="pdf_file_3"></p>
+        <p><button type="submit">Verify Certificates</button></p>
+    </form>
 </body>
 </html>
