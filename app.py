@@ -11,53 +11,125 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = 'your-secret-key-here'
 
+# Debug mode - set to False in production
+DEBUG = True
+
 # Course patterns that match your exact certificates
 APPROVED_COURSES = {
-    r"Mandatory - Living up to Our Commitments RCM Training": "RCM",
-    r"Mandatory - Working In Partnership with BT": "BT-PART", 
-    r"Don't Feed The 'ish": "DFT"
+    "Mandatory - Living up to Our Commitments RCM Training": "RCM",
+    "Mandatory - Working In Partnership with BT": "BT-PART", 
+    "Don't Feed The 'ish": "DFT"
 }
 
-def extract_certificate_data(text):
-    """Extract data from your specific certificate format"""
-    # Pattern that matches your exact certificate structure
-    pattern = re.compile(
-        r"Certificate of completion.*?"
-        r"This is to certify that\s*\n*\s*---*\s*\n*\s*(.*?)\s*\n*\s*"
-        r"has completed\s*\n*\s*---*\s*\n*\s*(.*?)\s*\n*\s*"
-        r"on\s*\n*\s*(\d{1,2}/\d{1,2}/\d{4})",
-        re.DOTALL
-    )
-    
-    match = pattern.search(text)
-    if match:
-        return {
-            'name': match.group(1).strip(),
-            'course': match.group(2).strip(),
-            'date': match.group(3).strip()
+def debug_print(message):
+    if DEBUG:
+        print(f"[DEBUG] {message}")
+
+def extract_certificate_data(text, filename):
+    """Extract data from certificate with detailed debugging"""
+    debug_print(f"\nProcessing file: {filename}")
+    debug_print("Full text content:")
+    debug_print("="*50)
+    debug_print(text)
+    debug_print("="*50)
+
+    # Try multiple patterns to handle variations
+    patterns = [
+        # Primary pattern for standard BT certificates
+        {
+            'name': r"Certificate of completion.*?This is to certify that\s*\n*\s*-+\s*\n*\s*(.*?)\s*\n*\s*has completed",
+            'course': r"has completed\s*\n*\s*-+\s*\n*\s*(.*?)\s*\n*\s*on",
+            'date': r"on\s*\n*\s*(\d{1,2}/\d{1,2}/\d{4})"
+        },
+        # Fallback pattern
+        {
+            'course': r"has completed\s*(.*?)\s*on",
+            'date': r"on\s*(\d{1,2}/\d{1,2}/\d{4})"
         }
+    ]
+
+    for i, pattern in enumerate(patterns, 1):
+        debug_print(f"\nTrying pattern {i}:")
+        try:
+            # Extract name (if pattern includes it)
+            name = None
+            if 'name' in pattern:
+                name_match = re.search(pattern['name'], text, re.DOTALL)
+                if name_match:
+                    name = name_match.group(1).strip()
+                    debug_print(f"Name found: {name}")
+                else:
+                    debug_print("Name not found with this pattern")
+                    continue
+
+            # Extract course title
+            course_match = re.search(pattern['course'], text, re.DOTALL)
+            if not course_match:
+                debug_print("Course title not found with this pattern")
+                continue
+            
+            course_title = course_match.group(1).strip()
+            debug_print(f"Course title found: {course_title}")
+
+            # Extract date
+            date_match = re.search(pattern['date'], text)
+            if not date_match:
+                debug_print("Date not found with this pattern")
+                continue
+            
+            date = date_match.group(1)
+            debug_print(f"Date found: {date}")
+
+            return {
+                'name': name,
+                'course': course_title,
+                'date': date
+            }
+
+        except Exception as e:
+            debug_print(f"Error with pattern {i}: {str(e)}")
+            continue
+
+    debug_print("No patterns matched the certificate content")
     return None
 
 def verify_certificate(pdf_path):
     try:
+        debug_print(f"\nStarting verification for: {pdf_path}")
+        
+        # Open PDF and extract text
         doc = fitz.open(pdf_path)
         text = ""
-        for page in doc:
-            text += page.get_text("text")  # Use "text" extraction mode
+        for page_num, page in enumerate(doc, 1):
+            page_text = page.get_text("text")
+            debug_print(f"\nPage {page_num} content:")
+            debug_print(page_text)
+            text += page_text + "\n"
+
+        # Basic validation
+        required_markers = ["BT Group", "Certificate of completion"]
+        missing_markers = [marker for marker in required_markers if marker not in text]
         
-        # Check for required certificate markers
-        if not all(x in text for x in ["BT Group", "Certificate of completion"]):
+        if missing_markers:
+            debug_print(f"Missing required markers: {', '.join(missing_markers)}")
             return None
 
-        data = extract_certificate_data(text)
+        # Extract certificate data
+        data = extract_certificate_data(text, os.path.basename(pdf_path))
         if not data:
+            debug_print("Failed to extract certificate data")
             return None
 
-        # Exact course title matching
+        # Verify course title
         course_title = data['course']
+        debug_print(f"Verifying course title: {course_title}")
+
         if course_title not in APPROVED_COURSES:
+            debug_print("Course title not in approved courses list")
+            debug_print(f"Approved courses: {list(APPROVED_COURSES.keys())}")
             return None
 
+        debug_print("Certificate verification successful!")
         return {
             "filename": os.path.basename(pdf_path),
             "course_title": course_title,
@@ -67,7 +139,7 @@ def verify_certificate(pdf_path):
         }
 
     except Exception as e:
-        print(f"Error processing {pdf_path}: {str(e)}")
+        debug_print(f"Verification error: {str(e)}")
         return None
 
 def generate_verification_pdf(verified_courses):
@@ -117,6 +189,7 @@ def index():
         for file in [f for f in files if f and f.filename]:
             if not file.filename.lower().endswith('.pdf'):
                 invalid_files.append(file.filename)
+                flash(f"{file.filename} is not a PDF file", "error")
                 continue
 
             try:
@@ -127,12 +200,13 @@ def index():
                 result = verify_certificate(file_path)
                 if result:
                     verified_courses.append(result)
+                    flash(f"{file.filename} verified successfully!", "success")
                 else:
                     invalid_files.append(file.filename)
-                    print(f"Verification failed for: {file.filename}")
+                    flash(f"Verification failed for {file.filename}", "error")
             except Exception as e:
                 invalid_files.append(file.filename)
-                print(f"Error processing {file.filename}: {str(e)}")
+                flash(f"Error processing {file.filename}: {str(e)}", "error")
 
         if verified_courses:
             try:
@@ -142,12 +216,7 @@ def index():
                 response.headers['Content-Disposition'] = 'inline; filename=bt_verification_report.pdf'
                 return response
             except Exception as e:
-                flash(f"Failed to generate PDF: {str(e)}", "error")
-        
-        if invalid_files:
-            flash("Verification failed for:", "error")
-            for filename in invalid_files:
-                flash(f"- {filename}", "error")
+                flash(f"Failed to generate PDF report: {str(e)}", "error")
         
         return redirect(request.url)
 
