@@ -7,13 +7,15 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.secret_key = 'your-secret-key-here'
 
+# Approved course patterns
 APPROVED_COURSES = {
     r"(?i)living up to our commitments rcm training": "RCM",
     r"(?i)working in partnership with bt": "BT-PART",
-    r"(?i)feed the": "DFT"
+    r"(?i)[^\w]*don't[^\w]*feed[^\w]*the[^\w]*'ish": "DFT"
 }
 
 def extract_certificate_data(text):
+    """Attempt to extract name, course, and date from PDF text"""
     patterns = [
         {
             'name': re.compile(r"certificate of completion.*?This is to certify that\s*(.*?)\s*has completed", re.DOTALL | re.IGNORECASE),
@@ -32,12 +34,11 @@ def extract_certificate_data(text):
             name_match = pattern['name'].search(text)
             course_match = pattern['course'].search(text)
             date_match = pattern['date'].search(text)
-
             if name_match and course_match:
                 return {
                     'name': name_match.group(1).strip(),
                     'course': course_match.group(1).strip(),
-                    'date': date_match.group(1) if date_match else None
+                    'date': date_match.group(1) if date_match else "Date not found"
                 }
         except Exception:
             continue
@@ -51,8 +52,11 @@ def verify_certificate(pdf_path):
         for page in doc:
             text += page.get_text()
 
+        print(f"\n--- Extracted text from {os.path.basename(pdf_path)} ---\n{text}\n--- End of text ---\n")
+
         data = extract_certificate_data(text)
         if not data:
+            print(f"❌ Could not extract structured data from: {pdf_path}")
             return None
 
         course_title = data['course']
@@ -64,13 +68,14 @@ def verify_certificate(pdf_path):
                 break
 
         if not course_code:
+            print(f"❌ Course not approved: {course_title}")
             return None
 
         return {
             "name": data['name'],
             "course_title": course_title,
             "course_code": course_code,
-            "completion_date": data['date'] or "Date not available",
+            "completion_date": data['date'],
             "filename": os.path.basename(pdf_path)
         }
 
@@ -106,13 +111,13 @@ def index():
                 else:
                     invalid_files.append(file.filename)
             except Exception as e:
-                invalid_files.append(file.filename)
                 flash(f"Error processing {file.filename}: {str(e)}", "error")
+                invalid_files.append(file.filename)
 
-        return render_template('verification_results.html', verified_courses=verified_courses, invalid_files=invalid_files)
+        return render_template('results.html', verified_courses=verified_courses, invalid_files=invalid_files)
 
     return render_template('index.html')
-
+    
 if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     app.run(host='0.0.0.0', port=5000, debug=True)
