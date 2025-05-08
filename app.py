@@ -92,5 +92,34 @@ def index():
         verified_courses = []
         rejected_files = []
 
-        for file in filter(None, files):
-            if not file.filename
+        for file in [f for f in files if f is not None]:
+            if not file.filename.lower().endswith('.pdf'):
+                rejected_files.append(file.filename)
+                continue
+
+            try:
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+                file.save(file_path)
+                result = verify_certificate(file_path)
+                if result:
+                    verified_courses.append(result)
+                else:
+                    rejected_files.append(file.filename)
+            except Exception as e:
+                rejected_files.append(file.filename)
+
+        if verified_courses:
+            pdf_buffer = generate_verification_pdf(verified_courses)
+            response = make_response(pdf_buffer.getvalue())
+            response.headers['Content-Type'] = 'application/pdf'
+            response.headers['Content-Disposition'] = 'inline; filename=bt_certificate_verification.pdf'
+            return response
+        else:
+            flash("No valid BT certificates were found in the uploaded files", "error")
+            return redirect(request.url)
+
+    return render_template('index.html')
+
+if __name__ == '__main__':
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
