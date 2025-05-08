@@ -2,51 +2,88 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>PDF Certificate Extractor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BT Certificate Verification</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            background-color: #f8f9fa;
+        }
+        .upload-area:hover {
+            border-color: #0d6efd;
+            background-color: #e9ecef;
+        }
+        .status-badge {
+            font-size: 0.9rem;
+            margin-left: 10px;
+        }
+    </style>
 </head>
 <body class="bg-light">
-<div class="container mt-5">
-    <h2 class="mb-4">Upload Certificate PDFs</h2>
-    
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            <div class="alert alert-warning">
-                {% for message in messages %}
-                    <p>{{ message }}</p>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
-    
-    <form method="post" enctype="multipart/form-data">
-        <div class="mb-3">
-            <label class="form-label">Certificate PDF 1:</label>
-            <input class="form-control" type="file" name="pdf_file_1" accept=".pdf">
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Certificate PDF 2:</label>
-            <input class="form-control" type="file" name="pdf_file_2" accept=".pdf">
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Certificate PDF 3:</label>
-            <input class="form-control" type="file" name="pdf_file_3" accept=".pdf">
-        </div>
-        <button class="btn btn-primary" type="submit">Extract</button>
-    </form>
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h2 class="mb-0">BT Certificate Verification</h2>
+                    </div>
+                    <div class="card-body">
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                    <div class="alert alert-{{ 'danger' if category == 'error' else 'info' }} alert-dismissible fade show">
+                                        {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
 
-    {% if extracted %}
-        <hr>
-        <h4 class="mt-4">Extracted Information:</h4>
-        {% for data in extracted %}
-            <div class="card p-3 mb-3">
-                <h5>{{ data.Filename }}</h5>
-                <p><strong>Name:</strong> {{ data.Name }}</p>
-                <p><strong>Course Title:</strong> {{ data["Course Title"] }}</p>
-                <p><strong>Completion Date:</strong> {{ data["Completion Date"] }}</p>
+                        <div class="upload-area">
+                            <h4>Upload BT Certificates</h4>
+                            <p class="text-muted">Upload up to 3 certificate PDFs for verification</p>
+                            <form method="post" enctype="multipart/form-data" class="mt-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Certificate 1:</label>
+                                    <input class="form-control" type="file" name="pdf_file_1" accept=".pdf">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Certificate 2:</label>
+                                    <input class="form-control" type="file" name="pdf_file_2" accept=".pdf">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Certificate 3:</label>
+                                    <input class="form-control" type="file" name="pdf_file_3" accept=".pdf">
+                                </div>
+                                <button class="btn btn-primary btn-lg" type="submit">
+                                    <i class="bi bi-upload"></i> Verify Certificates
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="mt-4">
+                            <h5>How It Works</h5>
+                            <ol>
+                                <li>Upload your BT certificate PDFs (max 3 at a time)</li>
+                                <li>Our system will verify each certificate</li>
+                                <li>If valid, you'll automatically receive a verification PDF</li>
+                                <li>Invalid certificates will show an error message</li>
+                            </ol>
+                        </div>
+                    </div>
+                    <div class="card-footer text-muted">
+                        BT Certificate Verification System - © 2024
+                    </div>
+                </div>
             </div>
-        {% endfor %}
-    {% endif %}
-</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
